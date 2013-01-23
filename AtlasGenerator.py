@@ -76,10 +76,17 @@ class MultitaskWorker:
 def generate_files_list(paths):
     flist = []
     for path in paths:
-        for (root, dirs, files) in os.walk(path):
-            for fname in files:
-                fpath = os.path.join(root, fname)
-                flist.append(fpath)
+        if os.path.isdir(path):
+            for (root, dirs, files) in os.walk(path):
+                for fname in files:
+                    fpath = os.path.join(root, fname)
+                    flist.append(fpath)
+
+        elif os.path.isfile(path):
+            flist.append(path)
+
+        else:
+            raise Exception("Unknown path: {0}".format(path))
 
     return flist
 
@@ -228,7 +235,11 @@ class AtlasGenerator:
     def generateImagesInfo(self, files):
         infos = []
         for f in files:
-            im = Image.open(f)
+            try:
+                im = Image.open(f)
+            except:
+                continue
+
             if im.mode != self.pixel_type:
                 im = im.convert(self.pixel_type)
             #print(f, im.format, im.mode)
@@ -331,8 +342,8 @@ def main():
     from pprint import pprint as pp
 
     parser = OptionParser(
-        usage = "%prog [options] <width> <height> <dir> [...]",
-        description = "A texture atlas generator. Specify desired width and height of the output images and directories to look for images. Generator will produce atlas images and text file with pixel coordinates."
+        usage = "%prog [options] <width> <height> <paths...>",
+        description = "A texture atlas generator. Specify desired width and height of the output images and paths of directories and files to look for images. Generator will produce atlas images and text file with pixel coordinates."
     )
     parser.add_option("-n", "--dry-run", action="store_true", default=False, help="Do not write files.")
     parser.add_option("-s", "--spacing", default='0', help="Spacing between textures in atlas, in pixels. Default is 0.")
@@ -347,8 +358,8 @@ def main():
         options.spacing = int(options.spacing)
         w = int(args[0])
         h = int(args[1])
-        dir_paths = args[2:]
-        if len(dir_paths) < 1:
+        paths = args[2:]
+        if len(paths) < 1:
             raise Exception
 
     except:
@@ -362,11 +373,10 @@ def main():
         spacing=options.spacing,
 #        quiet=options.quiet
     )
-    metainfo = agen.generate(dir_paths)
+    metainfo = agen.generate(paths)
 
-    if not options.dry_run:
+    if not options.dry_run and metainfo is not None:
         (atlases_info, images_info) = metainfo
-        #pp(metainfo)
         meta_fname = options.prefix+'.txt'
         with open(meta_fname, 'wb') as f:
             metawriter = csv.writer(f, delimiter=' ')#, quotechar='|', quoting=csv.QUOTE_MINIMAL)
